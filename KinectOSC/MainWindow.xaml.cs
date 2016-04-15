@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using Microsoft.Kinect;
 
 namespace KinectOSC
@@ -10,6 +12,15 @@ namespace KinectOSC
     public partial class MainWindow : Window
     {
         KinectSensor kinect;
+        ColorFrameReader colorFrameReader;
+        FrameDescription colorFrameDesc;
+        ColorImageFormat colorFormat = ColorImageFormat.Bgra;
+
+        // WPF
+        WriteableBitmap colorBitmap;
+        byte[] colorBuffer;
+        int colorStride;
+        Int32Rect colorRect;
 
         public MainWindow()
         {
@@ -21,17 +32,55 @@ namespace KinectOSC
             try
             {
                 kinect = KinectSensor.GetDefault();
-                if (kinect == null)
-                {
-                    throw new Exception("Kinectを開けません");
-                }
+                if (kinect == null) { throw new Exception("Kinectを開けません"); }
                 kinect.Open();
+
+                // カラー画像の情報を作成(BGRA)
+                colorFrameDesc = kinect.ColorFrameSource.CreateFrameDescription(colorFormat);
+
+                // カラーリーダーを開く
+                colorFrameReader = kinect.ColorFrameSource.OpenReader();
+                colorFrameReader.FrameArrived += colorFrameReader_FrameArrived;
+
+                // カラー用のビットマップを作成
+                colorBitmap = new WriteableBitmap(colorFrameDesc.Width, colorFrameDesc.Height,
+                                                  96, 96, PixelFormats.Bgra32, null);
+
+                colorStride = colorFrameDesc.Width * (int)colorFrameDesc.BytesPerPixel;
+                colorRect = new Int32Rect(0, 0, colorFrameDesc.Width, colorFrameDesc.Height);
+                colorBuffer = new byte[colorStride * colorFrameDesc.Height];
+                ImageColor.Source = colorBitmap;
             }
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message);
                 Close();
             }
+        }
+
+        private void colorFrameReader_FrameArrived(object sender, ColorFrameArrivedEventArgs e)
+        {
+            UpdateColorFrame(e);
+            DrawColorFrame();
+        }
+
+        private void UpdateColorFrame(ColorFrameArrivedEventArgs args)
+        {
+            // カラーフレームを取得
+            using (var colorFrame = args.FrameReference.AcquireFrame())
+            {
+                if (colorFrame == null) { return; }
+
+                // BGRAデータを取得する
+                colorBuffer = new byte[colorFrameDesc.LengthInPixels * colorFrameDesc.BytesPerPixel];
+                colorFrame.CopyConvertedFrameDataToArray(colorBuffer, ColorImageFormat.Bgra);
+            }
+        }
+
+        private void DrawColorFrame()
+        {
+            // ビットマップにする
+            colorBitmap.WritePixels(colorRect, colorBuffer, colorStride, 0);
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)

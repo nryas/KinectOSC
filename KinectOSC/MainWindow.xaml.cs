@@ -3,6 +3,8 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.Kinect;
+using Rug.Osc;
+using System.Net;
 
 namespace KinectOSC
 {
@@ -89,6 +91,24 @@ namespace KinectOSC
             {
                 kinect.Close();
                 kinect = null;
+            }
+        }
+
+        private void ButtonSetIP_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string[] ip = { IP1.Text.ToString(), IP2.Text.ToString(), IP3.Text.ToString(), IP4.Text.ToString() };
+                IPAddress sendAddress = IPAddress.Parse(string.Join(".", ip));
+                using (OscSender oscSender = new OscSender(sendAddress, int.Parse(Port.Text.ToString())))
+                {
+                    oscSender.Connect();
+                    oscSender.Send(new OscMessage("/msg", 1, 2));
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"エラーが発生しました：{ex.Message.ToString()}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }

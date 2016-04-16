@@ -10,11 +10,14 @@
         Closing="Window_Closing">
     <Grid>
         <Grid Panel.ZIndex="1">
-            <TextBox x:Name="IP1" MaxLength="3" Width="46" Height="22" FontSize="16" HorizontalAlignment="Left" VerticalAlignment="Top" InputMethod.PreferredImeState="Off" Margin="32,18,0,0" TextAlignment="Right" />
-            <TextBox x:Name="IP2" MaxLength="3" Width="46" Height="22" FontSize="16" HorizontalAlignment="Left" VerticalAlignment="Top" InputMethod.PreferredImeState="Off" Margin="83,18,0,0" TextAlignment="Right" />
-            <TextBox x:Name="IP3" MaxLength="3" Width="46" Height="22" FontSize="16" HorizontalAlignment="Left" VerticalAlignment="Top" InputMethod.PreferredImeState="Off" Margin="134,18,0,0" TextAlignment="Right" />
-            <TextBox x:Name="IP4" MaxLength="3" Width="46" Height="22" FontSize="16" HorizontalAlignment="Left" VerticalAlignment="Top" InputMethod.PreferredImeState="Off" Margin="184,18,0,0" TextAlignment="Right" />
-            <Button x:Name="ButtonSetIP" Width="46" Height="22"  FontSize="16" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="247,18,0,0" Content="OK"></Button>
+            <Label Margin="28,10,0,0" HorizontalAlignment="Left">IPアドレス</Label>
+            <TextBox x:Name="IP1" MaxLength="3" Width="46" Height="22" FontSize="16" HorizontalAlignment="Left" VerticalAlignment="Top" InputMethod.PreferredImeState="Off" Margin="32,36,0,0" TextAlignment="Right" />
+            <TextBox x:Name="IP2" MaxLength="3" Width="46" Height="22" FontSize="16" HorizontalAlignment="Left" VerticalAlignment="Top" InputMethod.PreferredImeState="Off" Margin="83,36,0,0" TextAlignment="Right" />
+            <TextBox x:Name="IP3" MaxLength="3" Width="46" Height="22" FontSize="16" HorizontalAlignment="Left" VerticalAlignment="Top" InputMethod.PreferredImeState="Off" Margin="134,36,0,0" TextAlignment="Right" />
+            <TextBox x:Name="IP4" MaxLength="3" Width="46" Height="22" FontSize="16" HorizontalAlignment="Left" VerticalAlignment="Top" InputMethod.PreferredImeState="Off" Margin="185,36,0,0" TextAlignment="Right" />
+            <Label Margin="249,10,0,0">ポート</Label>
+            <TextBox x:Name="Port" MaxLength="5" Width="46" Height="22" FontSize="16" HorizontalAlignment="Left" VerticalAlignment="Top" InputMethod.PreferredImeState="Off" Margin="253,36,0,0" TextAlignment="Right" />
+            <Button x:Name="ButtonSetIP" Width="46" Height="22"  FontSize="14" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="317,36,0,0" Content="OK" Click="ButtonSetIP_Click"></Button>
         </Grid>
         <Image x:Name="ImageColor" Width="960" Height="540" VerticalAlignment="Bottom" />
     </Grid>

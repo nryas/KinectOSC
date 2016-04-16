@@ -31,6 +31,11 @@ namespace KinectOSC
         VisualGestureBuilderFrameReader[] gestureFrameReaders;
         IReadOnlyList<Gesture> gestures;
 
+        // OSC
+        OscSender oscSender;
+        IPAddress sendAddress;
+        ushort    sendPort;
+
         // WPF
         WriteableBitmap colorBitmap;
         byte[] colorBuffer;
@@ -86,12 +91,12 @@ namespace KinectOSC
             }
         }
 
-        void colorFrameReader_FrameArrived(object sender, ColorFrameArrivedEventArgs e)
+        private void colorFrameReader_FrameArrived(object sender, ColorFrameArrivedEventArgs e)
         {
             UpdateColorFrame(e);
             DrawColorFrame();
         }
-        void UpdateColorFrame(ColorFrameArrivedEventArgs args)
+        private void UpdateColorFrame(ColorFrameArrivedEventArgs args)
         {
             // カラーフレームを取得
             using (var colorFrame = args.FrameReference.AcquireFrame())
@@ -108,12 +113,12 @@ namespace KinectOSC
             // ビットマップにする
             colorBitmap.WritePixels(colorRect, colorBuffer, colorStride, 0);
         }
-        void bodyFrameReader_FrameArrived(object sender, BodyFrameArrivedEventArgs e)
+        private void bodyFrameReader_FrameArrived(object sender, BodyFrameArrivedEventArgs e)
         {
             UpdateBodyFrame();
         }
 
-        void InitializeGesture()
+        private void InitializeGesture()
         {
             gestureFrameReaders = new VisualGestureBuilderFrameReader[BODY_COUNT];
 
@@ -141,14 +146,14 @@ namespace KinectOSC
             }
         }
 
-        void gestureFrameReaders_FrameArrived(object sender, VisualGestureBuilderFrameArrivedEventArgs e)
+        private void gestureFrameReaders_FrameArrived(object sender, VisualGestureBuilderFrameArrivedEventArgs e)
         {
             VisualGestureBuilderFrame gestureFrame = e.FrameReference.AcquireFrame();
             if (gestureFrame == null) { return; }
             UpdateGestureFrame( gestureFrame );
             gestureFrame.Dispose();
         }
-        void UpdateGestureFrame(VisualGestureBuilderFrame gestureFrame)
+        private void UpdateGestureFrame(VisualGestureBuilderFrame gestureFrame)
         {
             // Tracking IDの登録確認
             bool tracked = gestureFrame.IsTrackingIdValid;
@@ -160,7 +165,7 @@ namespace KinectOSC
                 Result(gestureFrame, g);
             }
         }
-        void UpdateBodyFrame()
+        private void UpdateBodyFrame()
         {
             if (bodyFrameReader == null) { return; }
             BodyFrame bodyFrame = bodyFrameReader.AcquireLatestFrame();
@@ -179,20 +184,25 @@ namespace KinectOSC
             }
             bodyFrame.Dispose();
         }
-        void Result(VisualGestureBuilderFrame gestureFrame, Gesture gesture)
+        private void Result(VisualGestureBuilderFrame gestureFrame, Gesture gesture)
         {
             // どのReaderが取得したFrameかIndexを取得
             int count = GetIndexofGestureReader(gestureFrame);
             GestureType gestureType = gesture.GestureType;
+
+            List<OscMessage> messages = new List<OscMessage>();
+
             switch (gestureType)
             {
                 case GestureType.Discrete:
                     DiscreteGestureResult dGestureResult = gestureFrame.DiscreteGestureResults[gesture];
 
                     bool detected = dGestureResult.Detected;
-                    if (!detected) { break; }
+                    if (!detected) { return; }
 
                     float confidence = dGestureResult.Confidence;
+                    messages.Add(new OscMessage($"/{gesture.Name}", confidence));
+
                     //Console.WriteLine($"Confidence: {confidence.ToString()}");
                     break;
 
@@ -201,13 +211,28 @@ namespace KinectOSC
 
                     float progress = cGestureResult.Progress;
                     Console.WriteLine($"Progress: {progress.ToString()}");
+                    messages.Add(new OscMessage($"/{gesture.Name}", progress));
+
                     break;
 
                 default:
                     break;
             }
+
+            if (sendAddress != null && sendPort.ToString() != "")
+            {
+                using (oscSender = new OscSender(sendAddress, sendPort))
+                {
+                    oscSender.Connect();
+
+                    foreach (var m in messages)
+                    {
+                        oscSender.Send(m);
+                    }
+                }
+            }
         }
-        int GetIndexofGestureReader(VisualGestureBuilderFrame gestureFrame)
+        private int GetIndexofGestureReader(VisualGestureBuilderFrame gestureFrame)
         {
             for (int index = 0; index < BODY_COUNT; index++)
             {
@@ -232,12 +257,8 @@ namespace KinectOSC
             try
             {
                 string[] ip = { IP1.Text.ToString(), IP2.Text.ToString(), IP3.Text.ToString(), IP4.Text.ToString() };
-                IPAddress sendAddress = IPAddress.Parse(string.Join(".", ip));
-                using (OscSender oscSender = new OscSender(sendAddress, int.Parse(Port.Text.ToString())))
-                {
-                    oscSender.Connect();
-                    oscSender.Send(new OscMessage("/msg", 1, 2));
-                }
+                sendAddress = IPAddress.Parse(string.Join(".", ip));
+                sendPort    = (ushort)int.Parse(Port.Text.ToString());
             }
             catch (Exception ex)
             {

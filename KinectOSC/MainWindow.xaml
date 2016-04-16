@@ -5,10 +5,17 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:KinectOSC"
         mc:Ignorable="d"
-        Title="MainWindow" Height="350" Width="525"
+        Title="MainWindow" Height="660" Width="960"
         Loaded="Window_Loaded"
         Closing="Window_Closing">
     <Grid>
-        <Image x:Name="ImageColor" Width="960" Height="540" />
+        <Grid Panel.ZIndex="1">
+            <TextBox x:Name="IP1" MaxLength="3" Width="46" Height="22" FontSize="16" HorizontalAlignment="Left" VerticalAlignment="Top" InputMethod.PreferredImeState="Off" Margin="32,18,0,0" TextAlignment="Right" />
+            <TextBox x:Name="IP2" MaxLength="3" Width="46" Height="22" FontSize="16" HorizontalAlignment="Left" VerticalAlignment="Top" InputMethod.PreferredImeState="Off" Margin="83,18,0,0" TextAlignment="Right" />
+            <TextBox x:Name="IP3" MaxLength="3" Width="46" Height="22" FontSize="16" HorizontalAlignment="Left" VerticalAlignment="Top" InputMethod.PreferredImeState="Off" Margin="134,18,0,0" TextAlignment="Right" />
+            <TextBox x:Name="IP4" MaxLength="3" Width="46" Height="22" FontSize="16" HorizontalAlignment="Left" VerticalAlignment="Top" InputMethod.PreferredImeState="Off" Margin="184,18,0,0" TextAlignment="Right" />
+            <Button x:Name="ButtonSetIP" Width="46" Height="22"  FontSize="16" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="247,18,0,0" Content="OK"></Button>
+        </Grid>
+        <Image x:Name="ImageColor" Width="960" Height="540" VerticalAlignment="Bottom" />
     </Grid>
 </Window>

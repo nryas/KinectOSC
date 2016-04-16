@@ -45,11 +45,11 @@ namespace KinectOSC
                 // カラー用のビットマップを作成
                 colorBitmap = new WriteableBitmap(colorFrameDesc.Width, colorFrameDesc.Height,
                                                   96, 96, PixelFormats.Bgra32, null);
+                ImageColor.Source = colorBitmap;
 
                 colorStride = colorFrameDesc.Width * (int)colorFrameDesc.BytesPerPixel;
-                colorRect = new Int32Rect(0, 0, colorFrameDesc.Width, colorFrameDesc.Height);
+                colorRect   = new Int32Rect(0, 0, colorFrameDesc.Width, colorFrameDesc.Height);
                 colorBuffer = new byte[colorStride * colorFrameDesc.Height];
-                ImageColor.Source = colorBitmap;
             }
             catch (Exception ex)
             {

@@ -3,8 +3,10 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.Kinect;
+using Microsoft.Kinect.VisualGestureBuilder;
 using Rug.Osc;
 using System.Net;
+using System.Collections.Generic;
 
 namespace KinectOSC
 {
@@ -14,9 +16,20 @@ namespace KinectOSC
     public partial class MainWindow : Window
     {
         KinectSensor kinect;
+
+        // Color
         ColorFrameReader colorFrameReader;
         FrameDescription colorFrameDesc;
         ColorImageFormat colorFormat = ColorImageFormat.Bgra;
+
+        // Body
+        int BODY_COUNT;
+        BodyFrameReader bodyFrameReader;
+        Body[] bodies;
+
+        // Gesture
+        VisualGestureBuilderFrameReader[] gestureFrameReaders;
+        IReadOnlyList<Gesture> gestures;
 
         // WPF
         WriteableBitmap colorBitmap;
@@ -47,11 +60,24 @@ namespace KinectOSC
                 // カラー用のビットマップを作成
                 colorBitmap = new WriteableBitmap(colorFrameDesc.Width, colorFrameDesc.Height,
                                                   96, 96, PixelFormats.Bgra32, null);
-                ImageColor.Source = colorBitmap;
 
                 colorStride = colorFrameDesc.Width * (int)colorFrameDesc.BytesPerPixel;
                 colorRect   = new Int32Rect(0, 0, colorFrameDesc.Width, colorFrameDesc.Height);
                 colorBuffer = new byte[colorStride * colorFrameDesc.Height];
+                ImageColor.Source = colorBitmap;
+
+                // Bodyの最大数を取得する
+                BODY_COUNT = kinect.BodyFrameSource.BodyCount;
+
+                // Bodyを入れる配列を作る
+                bodies = new Body[BODY_COUNT];
+
+                // ボディーリーダーを開く
+                bodyFrameReader = kinect.BodyFrameSource.OpenReader();
+                bodyFrameReader.FrameArrived += bodyFrameReader_FrameArrived;
+
+                InitializeGesture();
+
             }
             catch (Exception ex)
             {
@@ -60,13 +86,12 @@ namespace KinectOSC
             }
         }
 
-        private void colorFrameReader_FrameArrived(object sender, ColorFrameArrivedEventArgs e)
+        void colorFrameReader_FrameArrived(object sender, ColorFrameArrivedEventArgs e)
         {
             UpdateColorFrame(e);
             DrawColorFrame();
         }
-
-        private void UpdateColorFrame(ColorFrameArrivedEventArgs args)
+        void UpdateColorFrame(ColorFrameArrivedEventArgs args)
         {
             // カラーフレームを取得
             using (var colorFrame = args.FrameReference.AcquireFrame())
@@ -78,13 +103,122 @@ namespace KinectOSC
                 colorFrame.CopyConvertedFrameDataToArray(colorBuffer, ColorImageFormat.Bgra);
             }
         }
-
         private void DrawColorFrame()
         {
             // ビットマップにする
             colorBitmap.WritePixels(colorRect, colorBuffer, colorStride, 0);
         }
+        void bodyFrameReader_FrameArrived(object sender, BodyFrameArrivedEventArgs e)
+        {
+            UpdateBodyFrame();
+        }
 
+        void InitializeGesture()
+        {
+            gestureFrameReaders = new VisualGestureBuilderFrameReader[BODY_COUNT];
+
+            // BodyごとにGesture Frame Readerを開く
+            for (int count = 0; count < BODY_COUNT; count++)
+            {
+                VisualGestureBuilderFrameSource gestureFrameSource = new VisualGestureBuilderFrameSource(kinect, 0);
+                gestureFrameReaders[count] = gestureFrameSource.OpenReader();
+                gestureFrameReaders[count].FrameArrived += gestureFrameReaders_FrameArrived;
+            }
+
+            // .gbdファイルからジェスチャーデータベースを作成
+            VisualGestureBuilderDatabase gestureDatabase = new VisualGestureBuilderDatabase("ultraman.gbd");
+
+            // データベースからジェスチャーを取得してGesture Frame Readerにそれぞれ登録
+            gestures = gestureDatabase.AvailableGestures;
+            for (int count = 0; count < BODY_COUNT; count++)
+            {
+                VisualGestureBuilderFrameSource gestureFrameSource = gestureFrameReaders[count].VisualGestureBuilderFrameSource;
+                gestureFrameSource.AddGestures(gestures);
+                foreach (var g in gestures)
+                {
+                    gestureFrameSource.SetIsEnabled(g, true);
+                }
+            }
+        }
+
+        void gestureFrameReaders_FrameArrived(object sender, VisualGestureBuilderFrameArrivedEventArgs e)
+        {
+            VisualGestureBuilderFrame gestureFrame = e.FrameReference.AcquireFrame();
+            if (gestureFrame == null) { return; }
+            UpdateGestureFrame( gestureFrame );
+            gestureFrame.Dispose();
+        }
+        void UpdateGestureFrame(VisualGestureBuilderFrame gestureFrame)
+        {
+            // Tracking IDの登録確認
+            bool tracked = gestureFrame.IsTrackingIdValid;
+            if (!tracked) { return; }
+
+            // ジェスチャーの認識結果を取得
+            foreach (var g in gestures)
+            {
+                Result(gestureFrame, g);
+            }
+        }
+        void UpdateBodyFrame()
+        {
+            if (bodyFrameReader == null) { return; }
+            BodyFrame bodyFrame = bodyFrameReader.AcquireLatestFrame();
+            if (bodyFrame == null){ return; }
+
+            bodyFrame.GetAndRefreshBodyData(bodies);
+            for (int count = 0; count < BODY_COUNT; count++)
+            {
+                Body body = bodies[count];
+                bool tracked = body.IsTracked;
+                if (!tracked) { continue; }
+                ulong trackingId = body.TrackingId;
+                VisualGestureBuilderFrameSource gestureFrameSource;
+                gestureFrameSource = gestureFrameReaders[count].VisualGestureBuilderFrameSource;
+                gestureFrameSource.TrackingId = trackingId;
+            }
+            bodyFrame.Dispose();
+        }
+        void Result(VisualGestureBuilderFrame gestureFrame, Gesture gesture)
+        {
+            // どのReaderが取得したFrameかIndexを取得
+            int count = GetIndexofGestureReader(gestureFrame);
+            GestureType gestureType = gesture.GestureType;
+            switch (gestureType)
+            {
+                case GestureType.Discrete:
+                    DiscreteGestureResult dGestureResult = gestureFrame.DiscreteGestureResults[gesture];
+
+                    bool detected = dGestureResult.Detected;
+                    if (!detected) { break; }
+
+                    float confidence = dGestureResult.Confidence;
+                    //Console.WriteLine($"Confidence: {confidence.ToString()}");
+                    break;
+
+                case GestureType.Continuous:
+                    ContinuousGestureResult cGestureResult = gestureFrame.ContinuousGestureResults[gesture];
+
+                    float progress = cGestureResult.Progress;
+                    Console.WriteLine($"Progress: {progress.ToString()}");
+                    break;
+
+                default:
+                    break;
+            }
+        }
+        int GetIndexofGestureReader(VisualGestureBuilderFrame gestureFrame)
+        {
+            for (int index = 0; index < BODY_COUNT; index++)
+            {
+                if (gestureFrame.TrackingId
+                    == gestureFrameReaders[index].VisualGestureBuilderFrameSource.TrackingId)
+                {
+                    return index;
+                }
+            }
+            return -1;
+        }
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             if (kinect != null)
@@ -93,7 +227,6 @@ namespace KinectOSC
                 kinect = null;
             }
         }
-
         private void ButtonSetIP_Click(object sender, RoutedEventArgs e)
         {
             try

@@ -201,17 +201,27 @@ namespace KinectOSC
                     if (!detected) { return; }
 
                     float confidence = dGestureResult.Confidence;
-                    messages.Add(new OscMessage($"/{gesture.Name}", confidence));
 
-                    //Console.WriteLine($"Confidence: {confidence.ToString()}");
+                    if (bodies[count].Joints.ContainsKey(JointType.Head))
+                    {
+                        Console.WriteLine($"dGestureProgress: {confidence.ToString()}");
+                        messages.Add(new OscMessage("/dGesture", $"{gesture.Name}", confidence));
+                        messages.Add(new OscMessage("/headPosX", $"/{bodies[count].Joints[JointType.Head].Position.X}"));
+                    }
+
                     break;
 
                 case GestureType.Continuous:
                     ContinuousGestureResult cGestureResult = gestureFrame.ContinuousGestureResults[gesture];
 
                     float progress = cGestureResult.Progress;
-                    Console.WriteLine($"Progress: {progress.ToString()}");
-                    messages.Add(new OscMessage($"/{gesture.Name}", progress));
+
+                    if (bodies[count].Joints.ContainsKey(JointType.Head))
+                    {
+                        Console.WriteLine($"cGestureProgress: {progress.ToString()}");
+                        messages.Add(new OscMessage("/cGesture", $"/{gesture.Name}", progress));
+                        messages.Add(new OscMessage("/headPosX", $"{bodies[count].Joints[JointType.Head].Position.X}"));
+                    }
 
                     break;
 

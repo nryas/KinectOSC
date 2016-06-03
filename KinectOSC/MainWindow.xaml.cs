@@ -7,6 +7,9 @@ using Microsoft.Kinect.VisualGestureBuilder;
 using Rug.Osc;
 using System.Net;
 using System.Collections.Generic;
+using System.Linq;
+using System.Windows.Shapes;
+using System.Windows.Controls;
 
 namespace KinectOSC
 {
@@ -113,6 +116,54 @@ namespace KinectOSC
             // ビットマップにする
             colorBitmap.WritePixels(colorRect, colorBuffer, colorStride, 0);
         }
+        private void DrawBodyFrame()
+        {
+            CanvasBody.Children.Clear();
+
+            // 追跡しているBodyのみループする
+            foreach (var body in bodies.Where( b => b.IsTracked ))
+            {
+                foreach (var joint in body.Joints)
+                {
+                    // 位置が追跡状態
+                    if (joint.Value.TrackingState == TrackingState.Tracked)
+                    {
+                        DrawEllipse(joint.Value, 30, Brushes.Blue);
+                    }
+
+                    // 位置が推測状態
+                    else if (joint.Value.TrackingState == TrackingState.Inferred)
+                    {
+                        DrawEllipse(joint.Value, 30, Brushes.Yellow);
+                    }
+                }
+            }
+        }
+
+        private void DrawEllipse(Joint joint, int R, Brush brush)
+        {
+            var ellipse = new Ellipse()
+            {
+                Width = R,
+                Height = R,
+                Fill = brush,
+            };
+
+            // カメラ座標系をDepth座標系に変換する.
+            //var point = kinect.CoordinateMapper.MapCameraPointToDepthSpace(joint.Position);
+            var point = kinect.CoordinateMapper.MapCameraPointToColorSpace(joint.Position);
+            if ((point.X < 0) || (point.Y < 0))
+            {
+                return;
+            }
+
+            // Depth座標系で円を配置する
+            Canvas.SetLeft(ellipse, point.X - (R / 2));
+            Canvas.SetTop(ellipse, point.Y - (R / 2));
+
+            CanvasBody.Children.Add(ellipse);
+        }
+
         private void bodyFrameReader_FrameArrived(object sender, BodyFrameArrivedEventArgs e)
         {
             UpdateBodyFrame();
@@ -131,7 +182,7 @@ namespace KinectOSC
             }
 
             // .gbdファイルからジェスチャーデータベースを作成
-            VisualGestureBuilderDatabase gestureDatabase = new VisualGestureBuilderDatabase("ultraman.gbd");
+            VisualGestureBuilderDatabase gestureDatabase = new VisualGestureBuilderDatabase("GestureDictionary.gbd");
 
             // データベースからジェスチャーを取得してGesture Frame Readerにそれぞれ登録
             gestures = gestureDatabase.AvailableGestures;
@@ -172,6 +223,7 @@ namespace KinectOSC
             if (bodyFrame == null){ return; }
 
             bodyFrame.GetAndRefreshBodyData(bodies);
+
             for (int count = 0; count < BODY_COUNT; count++)
             {
                 Body body = bodies[count];
@@ -181,9 +233,41 @@ namespace KinectOSC
                 VisualGestureBuilderFrameSource gestureFrameSource;
                 gestureFrameSource = gestureFrameReaders[count].VisualGestureBuilderFrameSource;
                 gestureFrameSource.TrackingId = trackingId;
+                DrawBodyFrame();
             }
             bodyFrame.Dispose();
         }
+        private Body ChooseClosestBody(Body[] bodies,
+            CameraSpacePoint closestPerson = new CameraSpacePoint(), float closestDistance = 2.0f)
+        {
+            Body closestBody = null;
+            var baseType = JointType.SpineBase;
+
+            // 追跡しているBodyから選ぶ
+            foreach (var body in bodies.Where(b => b.IsTracked))
+            {
+                // 比較する関節位置が追跡状態になければ対象外
+                if (body.Joints[baseType].TrackingState == TrackingState.NotTracked) { continue; }
+
+                // 中心からの距離が近い人を選ぶ
+                var distance = Distance(closestPerson, body.Joints[baseType].Position);
+                if (distance < closestDistance)
+                {
+                    closestDistance = distance;
+                    closestBody = body;
+                }
+            }
+
+            return closestBody;
+        }
+
+        float Distance (CameraSpacePoint p1, CameraSpacePoint p2)
+        {
+            return (float)Math.Sqrt((p2.X - p1.X) * (p2.X - p1.X) +
+                                    (p2.Y - p1.Y) * (p2.Y - p1.Y) +
+                                    (p2.Z - p1.Z) * (p2.Z - p1.Z));
+        }
+
         private void Result(VisualGestureBuilderFrame gestureFrame, Gesture gesture)
         {
             // どのReaderが取得したFrameかIndexを取得
@@ -202,11 +286,10 @@ namespace KinectOSC
 
                     float confidence = dGestureResult.Confidence;
 
-                    if (bodies[count].Joints.ContainsKey(JointType.Head))
+                    if (bodies[count] == ChooseClosestBody(bodies, new CameraSpacePoint()))
                     {
-                        Console.WriteLine($"dGestureProgress: {confidence.ToString()}");
+                        Console.WriteLine($"dGesture: {gesture.Name} , {confidence.ToString()}");
                         messages.Add(new OscMessage("/dGesture", $"{gesture.Name}", confidence));
-                        messages.Add(new OscMessage("/headPosX", $"/{bodies[count].Joints[JointType.Head].Position.X}"));
                     }
 
                     break;
@@ -216,11 +299,10 @@ namespace KinectOSC
 
                     float progress = cGestureResult.Progress;
 
-                    if (bodies[count].Joints.ContainsKey(JointType.Head))
+                    if (bodies[count] == ChooseClosestBody(bodies, new CameraSpacePoint()))
                     {
-                        Console.WriteLine($"cGestureProgress: {progress.ToString()}");
+                        Console.WriteLine($"cGesture: {gesture.Name} , {progress.ToString()}");
                         messages.Add(new OscMessage("/cGesture", $"/{gesture.Name}", progress));
-                        messages.Add(new OscMessage("/headPosX", $"{bodies[count].Joints[JointType.Head].Position.X}"));
                     }
 
                     break;

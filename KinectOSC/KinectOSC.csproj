@@ -115,6 +115,7 @@
     </EmbeddedResource>
     <None Include="handsup.gbd" />
     <None Include="horizontal_handProgress.gba" />
+    <None Include="GestureDictionary.gbd" />
     <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
@@ -122,7 +123,6 @@
     </None>
     <AppDesigner Include="Properties\" />
     <None Include="SampleDatabase.gbd" />
-    <None Include="ultraman2.gbd" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
